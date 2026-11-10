@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>나의 비서</title>
+<style>
+  body { margin: 0; font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: #eef2f6; color: #1b2430; }
+  main { max-width: 480px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #5b6776; font-size: 14px; margin: 0 0 20px; }
+  .card { background: #fff; border-radius: 16px; padding: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .big { font-size: 48px; font-weight: 700; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; color: #5b6776; font-size: 14px; margin-top: 8px; }
+  .label { font-size: 13px; color: #5b6776; margin: 0 0 8px; }
+  .outfit { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+  ul { margin: 0; padding-left: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>나의 비서</h1>
+  <p class="sub" id="updated">날씨를 불러오는 중...</p>
+
+  <div class="card">
+    <p class="label">지금 서울</p>
+    <div class="big" id="temp">--°</div>
+    <div id="sky">-</div>
+    <div class="row">
+      <span id="feels">체감 --°</span>
+      <span id="humid">습도 --%</span>
+      <span id="wind">바람 -- m/s</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="label">오늘 하루</p>
+    <div class="row">
+      <span id="minmax">최저 --° / 최고 --°</span>
+      <span id="rain">비 올 확률 --%</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="label">오늘의 옷차림</p>
+    <p class="outfit" id="outfit">-</p>
+    <ul id="tips"></ul>
+  </div>
+</main>
+
+<script>
+// ① 위치: 서울시청. 다른 동네로 바꾸려면 이 두 숫자만 바꾸세요.
+const LAT = 37.5665;
+const LON = 126.9780;
+
+const url = "https://api.open-meteo.com/v1/forecast"
+  + "?latitude=" + LAT + "&longitude=" + LON
+  + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m"
+  + "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+  + "&wind_speed_unit=ms&timezone=Asia%2FSeoul&forecast_days=1";
+
+// ② 날씨 코드(숫자)를 한글로 바꾸기
+function skyText(code) {
+  if (code === 0) return "맑음 ☀️";
+  if (code <= 3) return "구름 조금~많음 ⛅";
+  if (code === 45 || code === 48) return "안개 🌫️";
+  if (code >= 51 && code <= 67) return "비 🌧️";
+  if (code >= 71 && code <= 77) return "눈 ❄️";
+  if (code >= 80 && code <= 82) return "소나기 🌦️";
+  if (code >= 85 && code <= 86) return "눈 소나기 🌨️";
+  if (code >= 95) return "천둥번개 ⛈️";
+  return "알 수 없음";
+}
+
+// ③ 기온별 옷차림 (숫자를 바꿔서 내 취향에 맞춰도 돼요)
+function outfitFor(t) {
+  if (t >= 28) return "민소매, 반팔, 반바지";
+  if (t >= 23) return "반팔, 얇은 셔츠, 면바지";
+  if (t >= 20) return "얇은 가디건, 긴팔 티, 면바지";
+  if (t >= 17) return "얇은 니트, 맨투맨, 청바지";
+  if (t >= 12) return "자켓, 가디건, 니트";
+  if (t >= 9)  return "트렌치코트, 야상, 니트";
+  if (t >= 5)  return "코트, 히트텍, 니트";
+  return "패딩, 두꺼운 코트, 목도리";
+}
+
+// ④ 날씨를 받아와서 화면에 넣기
+fetch(url)
+  .then(function (res) { return res.json(); })
+  .then(function (data) {
+    const now = data.current;
+    const day = data.daily;
+    const min = day.temperature_2m_min[0];
+    const max = day.temperature_2m_max[0];
+    const rain = day.precipitation_probability_max[0] || 0;
+
+    document.getElementById("temp").textContent = Math.round(now.temperature_2m) + "°";
+    document.getElementById("sky").textContent = skyText(now.weather_code);
+    document.getElementById("feels").textContent = "체감 " + Math.round(now.apparent_temperature) + "°";
+    document.getElementById("humid").textContent = "습도 " + now.relative_humidity_2m + "%";
+    document.getElementById("wind").textContent = "바람 " + now.wind_speed_10m + " m/s";
+    document.getElementById("minmax").textContent = "최저 " + Math.round(min) + "° / 최고 " + Math.round(max) + "°";
+    document.getElementById("rain").textContent = "비 올 확률 " + rain + "%";
+
+    // 옷차림은 하루 평균 기온 기준
+    const avg = (min + max) / 2;
+    document.getElementById("outfit").textContent = outfitFor(avg);
+
+    const tips = [];
+    if (max - min >= 10) tips.push("일교차가 " + Math.round(max - min) + "도예요. 겉옷을 챙기세요.");
+    if (rain >= 60) tips.push("비 올 확률이 높아요. 우산 필수!");
+    else if (rain >= 30) tips.push("비가 올 수도 있어요. 접이식 우산을 챙기세요.");
+    if (now.relative_humidity_2m < 35) tips.push("공기가 건조해요. 립밤과 물을 챙기세요.");
+    if (tips.length === 0) tips.push("특별히 챙길 건 없어요. 좋은 하루!");
+    document.getElementById("tips").innerHTML = tips.map(function (t) { return "<li>" + t + "</li>"; }).join("");
+
+    document.getElementById("updated").textContent = "기준 시각 " + now.time.slice(11, 16) + " · 출처 Open-Meteo";
+  })
+  .catch(function (err) {
+    document.getElementById("updated").textContent = "날씨를 못 불러왔어요. 인터넷 연결을 확인하고 새로고침하세요. (" + err + ")";
+  });
+</script>
+</body>
+</html>
